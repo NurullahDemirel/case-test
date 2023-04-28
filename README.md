@@ -21,4 +21,6 @@ customer can make booking between available rooms by giving enter_date and exit_
 
 ı calculate paid amount (if today is birthday applay %10 discount )
 
+you can find json file to import postman for testing
+
 
