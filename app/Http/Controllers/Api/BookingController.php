@@ -46,7 +46,7 @@ class BookingController extends Controller
             $exit_date = $request->exit_date;
             $room_id = $request->room_id;
 
-            $rooms =  $available_rooms = EscapeRoom::where('id', $room_id)->availableBetween($enter_date, $exit_date)->get();
+            $rooms = $available_rooms = EscapeRoom::where('id', $room_id)->availableBetween($enter_date, $exit_date)->get();
 
             if (!$rooms->count()) {
                 return $this->returnWithMessage([
@@ -107,7 +107,6 @@ class BookingController extends Controller
             $booking = auth()->user()->bookings()->where('id', $id,)->first();
 
 
-
             if (!$booking) {
                 return $this->returnWithMessage([
                     'This booking does not belong to you'
@@ -119,7 +118,7 @@ class BookingController extends Controller
             $room_id = $request->room_id;
             //if request same not befro info
             if (!(Carbon::parse($enter_date) == $booking->enter_date) && !(Carbon::parse($exit_date) == $booking->exit_date) && !($booking->room_id == $room_id)) {
-                $rooms =  $available_rooms = EscapeRoom::where('id', $room_id)->availableBetween($enter_date, $exit_date)->get();
+                $rooms = $available_rooms = EscapeRoom::where('id', $room_id)->availableBetween($enter_date, $exit_date)->get();
 
                 if (!$rooms->count()) {
                     return $this->returnWithMessage([
@@ -139,7 +138,7 @@ class BookingController extends Controller
             return $this->apiSuccessResponse([
                 'booking' => $booking,
                 'message' => 'Booking was updated.'
-            ])
+            ]);
         } catch (Exception $exception) {
             $this->exceptionResponse($exception);
         }
