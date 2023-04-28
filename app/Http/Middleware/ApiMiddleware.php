@@ -15,7 +15,6 @@ class ApiMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-
         $request->headers->set('Accept', 'application/json');
         $request->headers->set('Access-Control-Allow-Origin', '*');
 

@@ -15,6 +15,7 @@ return new class extends Migration {
             $table->string('name');
             $table->integer('floor');
             $table->decimal('price', 8, 2);
+            $table->integer('capacity')->default(3);
             $table->timestamps();
         });
     }

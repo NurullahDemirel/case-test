@@ -19,19 +19,19 @@ class EscapeRoom extends Model
     }
 
 
-    public function scopeAvailableBetween(Builder $query, $enter_date, $exit_date)
+    public function scopeAvailableBetween($query, $startdate, $enddate = null)
     {
-        $enter_date = Carbon::createFromFormat('Y-m-d H:i:s', $enter_date);
-        $exit_date = Carbon::createFromFormat('Y-m-d H:i:s', $exit_date);
-
-
-        return $query->whereDoesntHave('bookings', function ($query) use ($enter_date, $exit_date) {
-            $query->whereBetween('enter_date', [$enter_date, $exit_date])
-                ->orWhereBetween('exit_date', [$enter_date, $exit_date])
-                ->orWhere(function ($query) use ($enter_date, $exit_date) {
-                    $query->where('enter_date', '<', $enter_date)
-                        ->where('exit_date', '>', $exit_date);
-                });
+        return $query->whereDoesntHave('bookings', function ($q) use ($startdate, $enddate) {
+            $q->where(function ($query) use ($startdate, $enddate) {
+                $query->where('enter_date', '>=', $startdate)
+                    ->where('enter_date', '<', $enddate)
+                    ->orWhere('exit_date', '>', $startdate)
+                    ->where('exit_date', '<=', $enddate)
+                    ->orWhere(function ($query) use ($startdate, $enddate) {
+                        $query->where('enter_date', '<=', $startdate)
+                            ->where('exit_date', '>=', $enddate);
+                    });
+            });
         });
     }
 }

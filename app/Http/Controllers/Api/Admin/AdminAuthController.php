@@ -26,16 +26,16 @@ class AdminAuthController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return $this->returnWithMessage($validator->errors()->toArray());
+                return $this->returnWithError('Validation error', $validator->errors()->toArray());
             }
 
             if (Auth::attempt($info)) {
                 if (!auth()->user()->hasRole('Admin')) {
-                    return $this->returnWithMessage(['Please try with admin info!']);
+                    return $this->returnWithError('Please try with admin info!', [], Response::HTTP_FORBIDDEN);
                 }
-                return $this->apiSuccessResponse(['user' => auth()->user(), 'token' => auth()->user()->createToken('myApp')->plainTextToken], Response::HTTP_OK);
+                return $this->apiSuccessResponse('Login was success', ['user' => auth()->user(), 'token' => auth()->user()->createToken('myApp')->plainTextToken], Response::HTTP_OK);
             }
-            return $this->returnWithMessage(['Email or password is no true!']);
+            return $this->returnWithError(['Email or password is no true!']);
         } catch (Exception $exception) {
             return $this->exceptionResponse($exception);
         }

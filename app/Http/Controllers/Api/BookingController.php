@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\NewBookingRequest;
+use App\Http\Resources\BookingResource;
 use App\Models\Booking;
 use App\Models\EscapeRoom;
 use App\Traits\ApiTrait;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class BookingController extends Controller
@@ -19,9 +23,7 @@ class BookingController extends Controller
     public function index()
     {
         try {
-            return $this->apiSuccessResponse([
-                'bookings' => auth()->user()->bookings
-            ]);
+            return $this->apiSuccessResponse('', ['bookings' => auth()->user()->bookings]);
         } catch (Exception $exception) {
             $this->exceptionResponse($exception);
         }
@@ -30,36 +32,43 @@ class BookingController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(NewBookingRequest $request)
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'room_id' => 'required|exists:escape_rooms,id',
-                'enter_date' => ['required', 'date', 'before_or_equal:exit_date', 'date_format:Y-m-d H:i:s'],
-                'exit_date' => ['required', 'date', 'after_or_equal:enter_date', 'date_format:Y-m-d H:i:s']
-            ]);
 
-            if ($validator->fails()) {
-                return $this->returnWithMessage($validator->errors()->toArray());
-            }
             $enter_date = $request->enter_date;
             $exit_date = $request->exit_date;
             $room_id = $request->room_id;
 
-            $rooms = $available_rooms = EscapeRoom::where('id', $room_id)->availableBetween($enter_date, $exit_date)->get();
+            $userCount = $request->user_count;
 
-            if (!$rooms->count()) {
-                return $this->returnWithMessage([
-                    'This room not available for this dates'
-                ]);
+            $room  = EscapeRoom::where('id', $room_id)->availableBetween($enter_date, $exit_date)->first();
+
+            if (!$room) {
+                return $this->returnWithError('This room not available for this dates');
             }
 
-            $booking = auth()->user()->bookings()->create($request->all());
+            if ($userCount >= $room->capacity) {
+                return $this->returnWithError('This room is full');
+            }
 
-            return $this->apiSuccessResponse([
-                'booking' => $booking,
-                'message' => 'Your booking was created for between' . $request->enter_date . '-' . $request->exit_date
-            ]);
+            $isBirthday = $this->isTodayBirthDay(auth()->user()->birthday);
+
+            $paidAmount = $isBirthday ? (($room->price) - ($room->price * 0.1)) : $room->price;
+
+            $booking = DB::transaction(function () use ($request, $paidAmount, $room) {
+
+                $booking = auth()->user()->bookings()->create(array_merge(
+                    $request->all(),
+                    ['paid_amount' => $paidAmount, 'user_count' => $request->user_count]
+                ));
+
+                $room->update(['capacity' => ($room->capacity - $request->user_count)]);
+                return $booking;
+            });
+
+            $message = 'Your booking was created for between' . $request->enter_date . '-' . $request->exit_date;
+            return $this->apiSuccessResponse($message, ['booking' => new BookingResource($booking)]);
         } catch (Exception $exception) {
             return $this->exceptionResponse($exception);
         }
@@ -75,14 +84,10 @@ class BookingController extends Controller
             $booking = auth()->user()->bookings()->where('id', $id,)->first();
 
             if (!$booking) {
-                return $this->returnWithMessage([
-                    'Booking not found'
-                ]);
+                return $this->returnWithError('Booking not found', [], Response::HTTP_NOT_FOUND);
             }
 
-            return $this->apiSuccessResponse([
-                'booking' => $booking
-            ]);
+            return $this->apiSuccessResponse('', ['booking' => new BookingResource($booking)]);
         } catch (Exception $exception) {
             $this->exceptionResponse($exception);
         }
@@ -102,43 +107,44 @@ class BookingController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return $this->returnWithMessage($validator->errors()->toArray());
+                return $this->returnWithError('Bad request', $validator->errors()->toArray());
             }
             $booking = auth()->user()->bookings()->where('id', $id,)->first();
 
 
             if (!$booking) {
-                return $this->returnWithMessage([
-                    'This booking does not belong to you'
-                ]);
+                return $this->returnWithError('This booking does not belong to you');
             }
 
             $enter_date = $request->enter_date;
             $exit_date = $request->exit_date;
             $room_id = $request->room_id;
             //if request same not befro info
-            if (!(Carbon::parse($enter_date) == $booking->enter_date) && !(Carbon::parse($exit_date) == $booking->exit_date) && !($booking->room_id == $room_id)) {
-                $rooms = $available_rooms = EscapeRoom::where('id', $room_id)->availableBetween($enter_date, $exit_date)->get();
+            if (
+                (Carbon::parse($enter_date) == $booking->enter_date)
+                && (Carbon::parse($exit_date)->format('Y-m-d H:i:s') == $booking->exit_date->format('Y-m-d H:i:s'))
+                && ($booking->room_id == $room_id)
+            ) {
+                return $this->apiSuccessResponse('Booking was updated.', ['booking' => new BookingResource($booking)]);
+            } else {
+                dd('sasa');
+                //if customer want to cahnge room
+                if ($room_id != $booking->room_id) {
+                } else {
+                    dd('sasa');
+                    $rooms = $available_rooms = EscapeRoom::where('id', $room_id)->availableBetween($enter_date, $exit_date)->get();
 
-                if (!$rooms->count()) {
-                    return $this->returnWithMessage([
-                        'This room not available for this dates'
-                    ]);
+                    if (!$rooms->count()) {
+                        return $this->returnWithError('This room not available for this dates');
+                    }
+
+                    $booking->update([$request->all()]);
+
+                    $updatedBooking = Booking::find($id);
+
+                    return $this->apiSuccessResponse('Booking was updated.', ['booking' => $updatedBooking]);
                 }
-
-                $booking->update([$request->all()]);
-
-                $updatedBooking = Booking::find($id);
-
-                return $this->apiSuccessResponse([
-                    'booking' => $updatedBooking,
-                    'message' => 'Booking was updated.'
-                ]);
             }
-            return $this->apiSuccessResponse([
-                'booking' => $booking,
-                'message' => 'Booking was updated.'
-            ]);
         } catch (Exception $exception) {
             $this->exceptionResponse($exception);
         }
@@ -149,23 +155,21 @@ class BookingController extends Controller
      */
     public function destroy(string $id)
     {
-
-
         try {
             $booking = auth()->user()->bookings()->where('id', $id,)->first();
 
             if (!$booking) {
-                return $this->returnWithMessage([
-                    'Booking not found'
-                ]);
+                return $this->returnWithError('Booking not found');
             }
+            $userCount = $booking->user_count;
+
+            $booking->room->update(['capacity' => $booking->room->capacitiy + $userCount]);
+
             $booking->delete();
 
-            return $this->apiSuccessResponse([
-                'Bookings was deleted'
-            ]);
+            return $this->apiSuccessResponse('Bookings was deleted');
         } catch (Exception $exception) {
-            $this->exceptionResponse($exception);
+            return $this->exceptionResponse($exception);
         }
     }
 }

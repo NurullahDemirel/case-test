@@ -7,49 +7,45 @@ use App\Traits\ApiTrait;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\LoginRequest;
+use App\Http\Requests\Api\NewUserRequest;
+use App\Http\Resources\BookingResource;
+use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 
-class UserAuthController extends Controller
+class UserController extends Controller
 {
     use ApiTrait;
 
     public function __construct()
     {
-        $this->middleware('auth:sanctum')->except('login');
+        $this->middleware('auth:sanctum')->except('login', 'store');
     }
 
     public function profilePage()
     {
         try {
-            return  $this->apiSuccessResponse(['user' => auth()->user()]);
+            return  $this->apiSuccessResponse('', ['user' => auth()->user()]);
         } catch (\Exception $exception) {
             return $this->exceptionResponse($exception);
         }
     }
 
-    public function store(Request $request)
+    public function store(NewUserRequest $request)
     {
         try {
 
-            $validator = Validator::make($request->all(), [
-                'name' => 'required',
-                'email' => 'required|email|unique:users,email',
-                'password' => 'required',
-                'repeat_password' => 'required|same:password',
-            ]);
-
-            if ($validator->fails()) {
-                return $this->returnWithMessage($validator->errors()->toArray());
-            }
-
             $user = User::create($request->only('name', 'email', 'password'));
+
+            $user->assignRole('Customer');
 
             $token = $user->createToken('myApp')->plainTextToken;
 
             return $this->apiSuccessResponse(
+                'User was created',
                 [
                     'user' => $user,
                     'token' => $token
@@ -61,26 +57,17 @@ class UserAuthController extends Controller
         }
     }
 
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
         try {
 
-            $info = $request->only('email', 'password');
-
-            $validator = Validator::make($info, [
-                'email' => 'required|email|exists:users,email',
-                'password' => 'required|min:10'
-            ]);
-
-            if ($validator->fails()) {
-                return $this->returnWithMessage($validator->errors()->toArray());
-            }
+            $info = $request->validated();
 
             if (Auth::attempt($info)) {
                 $user = Auth::user();
                 $token =  $user->createToken('myApp')->plainTextToken;
 
-                return $this->apiSuccessResponse(['user' => $user, 'token' => $token], Response::HTTP_OK);
+                return $this->apiSuccessResponse('', ['user' => $user, 'token' => $token], Response::HTTP_OK);
             } else {
                 return response()->json([
                     'error' => 1,
@@ -103,7 +90,7 @@ class UserAuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return $this->returnWithMessage($validator->errors()->toArray());
+            return $this->returnWithError($validator->errors()->toArray());
         }
 
         $hasPasspword =  $request->has('password');
@@ -121,11 +108,9 @@ class UserAuthController extends Controller
 
             $updatedUser = User::find(auth()->id());
 
-            return $this->apiSuccessResponse(
-                ['user' => $updatedUser],
-                Response::HTTP_OK,
-                $hasPasspword  ? 'Your Password was updated successfully' : null
-            );
+            $data = $hasPasspword ?  array_merge(['user' => $updatedUser], ['change_password' => 'Your Password was updated successfully']) : ['user' => $updatedUser];
+
+            return $this->apiSuccessResponse('user was updated', $data);
         } catch (\Exception $exception) {
             return $this->exceptionResponse($exception);
         }
@@ -137,7 +122,7 @@ class UserAuthController extends Controller
             $user = User::find(auth()->id());
 
             if (!$user) {
-                return $this->returnWithMessage(['User not found', Response::HTTP_NOT_FOUND]);
+                return $this->returnWithError(['User not found', Response::HTTP_NOT_FOUND]);
             }
             $user->delete();
 
@@ -159,5 +144,14 @@ class UserAuthController extends Controller
             'error' => 0,
             'message' => 'You were logged out successfully'
         ], Response::HTTP_OK);
+    }
+
+    public function bookings()
+    {
+        try {
+            return $this->apiSuccessResponse('', ['bookings' => BookingResource::collection(auth()->user()->bookings)]);
+        } catch (Exception $exception) {
+            return $this->exceptionResponse($exception);
+        }
     }
 }

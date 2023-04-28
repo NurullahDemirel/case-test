@@ -15,8 +15,11 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('room_id')->constrained('escape_rooms')->cascadeOnDelete();
+            $table->decimal('paid_amount', 8, 2);
             $table->dateTime('enter_date');
             $table->dateTime('exit_date');
+            $table->integer('user_count');
+            $table->integer('apply_discount_percentage')->nullable()->default(0);
             $table->timestamps();
         });
     }

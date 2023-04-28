@@ -6,6 +6,7 @@ namespace Database\Seeders;
 
 use App\Models\EscapeRoom;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
@@ -31,6 +32,7 @@ class DatabaseSeeder extends Seeder
         $customer = User::create([
             'name' => 'Customer',
             'email' => 'usercustomer@gmail.com',
+            'birthday' => Carbon::parse('1998-08-03'),
             'password' => Hash::make('usercustomer')
         ]);
 
@@ -42,7 +44,9 @@ class DatabaseSeeder extends Seeder
             foreach (range(1, 6) as $room) {
                 EscapeRoom::create([
                     'name' => $roomCounter . 'Room',
-                    'floor' =>  $floor
+                    'floor' =>  $floor,
+                    'price' => (mt_rand(500, 1000) / 10),
+                    'capacity' => rand(3, 5)
                 ]);
 
                 $roomCounter++;
@@ -56,7 +60,7 @@ class DatabaseSeeder extends Seeder
 
         echo 'Rooms was created all rooms are emty right now. Start booking after login with user info' . PHP_EOL;
 
-        echo 'user-email : ' . $user->email . PHP_EOL;
+        echo 'user-email : ' . $user->customer . PHP_EOL;
         echo 'user-password : ' . 'usercustomer' . PHP_EOL;
     }
 }
