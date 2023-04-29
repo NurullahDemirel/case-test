@@ -35,9 +35,6 @@ class BookingController extends Controller
     public function store(NewBookingRequest $request)
     {
         try {
-
-            $enter_date = $request->enter_date;
-            $exit_date = $request->exit_date;
             $room_id = $request->room_id;
 
             $userCount = $request->user_count ?? 1;
