@@ -1,9 +1,8 @@
-1-run "composer install" fro vendor
+1-run "composer install" for vendor
 
+2-set your db info to the env file
 
-2-set your db info 
-
-3-run "php artisan migrate"
+3-run "php artisan migrate" for creating tables
 
 4-run "php artisan db:seed" for creating some dummy data;
 

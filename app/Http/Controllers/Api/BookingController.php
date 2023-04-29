@@ -11,7 +11,6 @@ use App\Traits\ApiTrait;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -58,7 +57,7 @@ class BookingController extends Controller
                     ['paid_amount' => $paidAmount, 'user_count' => $request->user_count]
                 ));
 
-                $room->update(['capacity' => ($room->capacity - $request->user_count)]);
+                $this->updateCapacity($booking, '-');
                 return $booking;
             });
 
@@ -114,31 +113,44 @@ class BookingController extends Controller
             $enter_date = $request->enter_date;
             $exit_date = $request->exit_date;
             $room_id = $request->room_id;
-            //if request same not befro info
-            if (
-                (Carbon::parse($enter_date) == $booking->enter_date)
-                && (Carbon::parse($exit_date)->format('Y-m-d H:i:s') == $booking->exit_date->format('Y-m-d H:i:s'))
-                && ($booking->room_id == $room_id)
-            ) {
-                return $this->apiSuccessResponse('Booking was updated.', ['booking' => new BookingResource($booking)]);
-            } else {
-                dd('sasa');
-                //if customer want to cahnge room
-                if ($room_id != $booking->room_id) {
-                } else {
-                    dd('sasa');
-                    $rooms = $available_rooms = EscapeRoom::where('id', $room_id)->availableBetween($enter_date, $exit_date)->get();
+            $userCount = $request->user_count ?? 1;
 
-                    if (!$rooms->count()) {
-                        return $this->returnWithError('This room not available for this dates');
-                    }
 
-                    $booking->update([$request->all()]);
+            //if customer want to change room
+            if ($room_id != $booking->room_id) {
+                $newRoom = EscapeRoom::first($room_id);
 
-                    $updatedBooking = Booking::find($id);
-
-                    return $this->apiSuccessResponse('Booking was updated.', ['booking' => $updatedBooking]);
+                if ($userCount > $newRoom->capacity) {
+                    return $this->returnWithError('This room is full');
                 }
+
+                DB::transaction(function () use ($booking, $newRoom, $enter_date, $exit_date) {
+                    //update old room capacity end 
+                    $this->updateCapacity($booking);
+
+                    return $booking->update([
+                        'room_id' => $newRoom->id,
+                        'enter_date' => $enter_date,
+                        'exit_date' => $exit_date
+                    ]);
+                });
+                $updatedBooking = Booking::find($id);
+
+                return $this->apiSuccessResponse('Booking was updated.', ['booking' => $updatedBooking]);
+            } else {
+                //get befor user count and delete , maybe customer come with some friends
+                DB::transaction(function () use ($booking, $enter_date, $exit_date, $userCount) {
+                    $this->updateCapacity($booking);
+                    return $booking->update([
+                        'enter_date' => $enter_date,
+                        'exit_date' => $exit_date,
+                        'user_count' => $userCount
+                    ]);
+                });
+
+                $updatedBooking = Booking::find($id);
+
+                return $this->apiSuccessResponse('Booking was updated.', ['booking' => $updatedBooking]);
             }
         } catch (Exception $exception) {
             $this->exceptionResponse($exception);
@@ -156,9 +168,8 @@ class BookingController extends Controller
             if (!$booking) {
                 return $this->returnWithError('Booking not found');
             }
-            $userCount = $booking->user_count;
 
-            $booking->room->update(['capacity' => $booking->room->capacity + $userCount]);
+            $this->updateCapacity($booking);
 
             $booking->delete();
 
@@ -166,5 +177,13 @@ class BookingController extends Controller
         } catch (Exception $exception) {
             return $this->exceptionResponse($exception);
         }
+    }
+
+
+    public function updateCapacity(Booking $booking, $process = '+')
+    {
+        $booking->room->update([
+            'capacity' =>  $process == '+' ? $booking->user_count + $booking->room->capacity : $booking->room->capacity - $booking->user_count
+        ]);
     }
 }
