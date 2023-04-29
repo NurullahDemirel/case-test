@@ -27,7 +27,7 @@ class DeleteExpiredBooking extends Command
      */
     public function handle()
     {
-        $bookings = Booking::with('room')->whereDate('exit_date', '>', now())->get();
+        $bookings = Booking::with('room')->whereDate('exit_date', '<', now())->get();
 
         foreach ($bookings as $booking) {
             DB::transaction(function () use ($booking) {
