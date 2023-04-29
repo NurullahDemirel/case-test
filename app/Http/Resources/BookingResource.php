@@ -15,9 +15,10 @@ class BookingResource extends JsonResource
     public function toArray(Request $request): array
     {
         $data = [
-            'room' => new RoomResource($this->room),
+            'id' => $this->id,
             'enter_date' => $this->enter_date->format('Y-m-d H:i:s'),
-            'exit_date' => $this->exit_date?->format('Y-m-d H:i:s')
+            'exit_date' => $this->exit_date?->format('Y-m-d H:i:s'),
+            'room' => new RoomResource($this->room),
         ];
 
         if ($this->apply_discount_percentage > 0) {

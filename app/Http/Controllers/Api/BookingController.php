@@ -40,21 +40,19 @@ class BookingController extends Controller
             $exit_date = $request->exit_date;
             $room_id = $request->room_id;
 
-            $userCount = $request->user_count;
+            $userCount = $request->user_count ?? 1;
 
-            $room  = EscapeRoom::where('id', $room_id)->availableBetween($enter_date, $exit_date)->first();
+            $room  = EscapeRoom::where('id', $room_id)->first();
 
-            if (!$room) {
-                return $this->returnWithError('This room not available for this dates');
-            }
-
-            if ($userCount >= $room->capacity) {
+            if ($userCount > $room->capacity) {
                 return $this->returnWithError('This room is full');
             }
 
-            $isBirthday = $this->isTodayBirthDay(auth()->user()->birthday);
+            if (!is_null(auth()->user()->birthday)) {
+                $isBirthday = $this->isTodayBirthDay(auth()->user()->birthday);
+            }
 
-            $paidAmount = $isBirthday ? (($room->price) - ($room->price * 0.1)) : $room->price;
+            $paidAmount = isset($isBirthday) && $isBirthday ? (($room->price) - ($room->price * 0.1)) : $room->price;
 
             $booking = DB::transaction(function () use ($request, $paidAmount, $room) {
 
@@ -163,7 +161,7 @@ class BookingController extends Controller
             }
             $userCount = $booking->user_count;
 
-            $booking->room->update(['capacity' => $booking->room->capacitiy + $userCount]);
+            $booking->room->update(['capacity' => $booking->room->capacity + $userCount]);
 
             $booking->delete();
 

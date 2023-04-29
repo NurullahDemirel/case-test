@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\LoginRequest;
 use App\Http\Requests\Api\NewUserRequest;
 use App\Http\Resources\BookingResource;
+use App\Http\Resources\UserResource;
 use Exception;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -38,7 +39,8 @@ class UserController extends Controller
     {
         try {
 
-            $user = User::create($request->only('name', 'email', 'password'));
+            $createData = $request->has('birthday') ? ['name', 'email', 'password', 'birthday'] : ['name', 'email', 'password'];
+            $user = User::create($request->only($createData));
 
             $user->assignRole('Customer');
 
@@ -47,7 +49,7 @@ class UserController extends Controller
             return $this->apiSuccessResponse(
                 'User was created',
                 [
-                    'user' => $user,
+                    'user' => new UserResource($user),
                     'token' => $token
                 ],
                 Response::HTTP_CREATED,
